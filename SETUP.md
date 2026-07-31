@@ -12,6 +12,7 @@ CommerceHub 集成了支付（支付宝/微信）、物流（快递鸟）、短�
 - [六、MySQL](#六mysql)
 - [七、本地启动](#七本地启动)
 - [八、接口清单](#八接口清单)
+- [九、GitHub Actions 自动部署（thin jar）](#九github-actions-自动部署thin-jar)
 
 ---
 
@@ -351,3 +352,78 @@ mvn spring-boot:run
 | `logistics_order` | 物流运单 |
 | `sms_record` | 短信发送记录 |
 | `cert_record` | 实名认证记录 |
+
+---
+
+## 九、GitHub Actions 自动部署（thin jar）
+
+每次推送到 main 分支，GitHub Actions 会自动构建并部署 thin jar（只含业务代码，几十KB）到服务器。
+
+### 服务器首次准备
+
+1. **装 JDK 17**
+   ```bash
+   apt update && apt install -y openjdk-17-jre-headless
+   ```
+
+2. **装 MySQL 8**（或用云数据库）
+   ```bash
+   docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=xxx -e MYSQL_DATABASE=commerce -p 3306:3306 mysql:8
+   ```
+
+3. **首次部署 lib 目录**（依赖包，约80MB，只传一次）
+   - 从 GitHub Actions 构建结果下载 `commercehub-lib` artifact
+   - 解压所有 jar 到服务器 `/opt/commercehub/lib/`
+   - 后续更新业务代码只传 thin jar，lib 不动
+
+4. **配置第三方密钥环境变量**（写 `/etc/commercehub.env`，供 systemd 或启动脚本读取）
+   ```bash
+   MYSQL_HOST=localhost
+   MYSQL_DB=commerce
+   MYSQL_USER=root
+   MYSQL_PASSWORD=xxx
+   ALIPAY_APP_ID=xxx
+   # ... 其他见「环境变量汇总」
+   ```
+
+### 配置 GitHub Secrets
+
+打开 仓库 Settings → Secrets and variables → Actions：
+
+**Secrets（敏感信息）：**
+
+| Secret 名 | 值 |
+|-----------|-----|
+| `SERVER_HOST` | 服务器IP/域名 |
+| `SERVER_PORT` | SSH端口(如22) |
+| `SERVER_USER` | SSH用户(如root) |
+| `SERVER_SSH_KEY` | SSH私钥内容 |
+| `DEPLOY_PATH` | 部署目录(如/opt/commercehub) |
+
+**Variables（非敏感开关）：**
+
+| Variable 名 | 值 | 说明 |
+|-------------|-----|------|
+| `ENABLE_DEPLOY` | `true` | 设为 true 才触发部署，不设或为其他值则跳过 |
+
+**生成 SSH 密钥**（在你本地电脑执行）：
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/commercehub_deploy -N ""
+ssh-copy-id -i ~/.ssh/commercehub_deploy.pub root@你的服务器IP
+cat ~/.ssh/commercehub_deploy   # 把内容贴到 SERVER_SSH_KEY Secret
+```
+
+### 部署流程
+
+配好 Secrets 并把 `ENABLE_DEPLOY` 设为 `true` 后，每次 `git push origin main`：
+
+1. GitHub Actions 编译构建
+2. SCP 上传 `commercehub.jar`（几十KB）和 `start.sh` 到服务器
+3. SSH 远程执行 `start.sh`：停旧进程 → 启动新进程 → 输出日志
+
+**首次部署前**，先把 lib 目录手动传到服务器（见上方「服务器首次准备」）。之后每次只传 thin jar，秒级更新。
+
+### 查看部署日志
+
+- GitHub Actions 页面：https://github.com/dengzongzong/commercehub/actions
+- 服务器日志：`tail -f /opt/commercehub/commercehub.log`
