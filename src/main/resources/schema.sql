@@ -59,3 +59,23 @@ CREATE TABLE IF NOT EXISTS `sms_record` (
     KEY `idx_phone` (`phone`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信发送记录';
+
+-- 实名认证记录
+CREATE TABLE IF NOT EXISTS `cert_record` (
+    `id`            BIGINT       NOT NULL AUTO_INCREMENT,
+    `biz_no`        VARCHAR(64)  NOT NULL COMMENT '业务流水号',
+    `user_id`       VARCHAR(64)  NOT NULL COMMENT '业务方用户ID',
+    `real_name`     VARCHAR(64)  NOT NULL COMMENT '真实姓名',
+    `cert_no`       VARCHAR(32)  NOT NULL COMMENT '身份证号',
+    `certify_id`    VARCHAR(64)           DEFAULT NULL COMMENT '支付宝认证流水号',
+    `status`        VARCHAR(16)  NOT NULL DEFAULT 'INIT' COMMENT 'INIT/PROCESSING/PASSED/FAILED',
+    `certify_url`   VARCHAR(512)          DEFAULT NULL COMMENT '认证页面URL',
+    `biz_code`      VARCHAR(16)           DEFAULT 'FACE' COMMENT '认证方式 FACE/SMART',
+    `create_time`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_biz_no` (`biz_no`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_certify_id` (`certify_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='实名认证记录';
+
