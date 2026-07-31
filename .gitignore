@@ -20,3 +20,6 @@ Thumbs.db
 
 # 敏感配置(本地覆盖用)
 application-local.yml
+
+# 打包产物
+*.zip
