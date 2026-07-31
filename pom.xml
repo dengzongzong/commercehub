@@ -21,8 +21,8 @@
     <properties>
         <java.version>17</java.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
-        <alipay-sdk.version>4.39.10.ALL</alipay-sdk.version>
-        <wechatpay-java.version>0.2.12</wechatpay-java.version>
+        <alipay-sdk.version>4.40.890.ALL</alipay-sdk.version>
+        <wechatpay-java.version>0.2.17</wechatpay-java.version>
         <aliyun-sms.version>2.0.24</aliyun-sms.version>
         <hutool.version>5.8.27</hutool.version>
     </properties>
@@ -58,6 +58,13 @@
             <groupId>com.alipay.sdk</groupId>
             <artifactId>alipay-sdk-java</artifactId>
             <version>${alipay-sdk.version}</version>
+        </dependency>
+
+        <!-- fastjson (支付宝SDK内部用，显式声明避免传递依赖缺失) -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.83</version>
         </dependency>
 
         <!-- 微信支付 SDK (v3) -->
