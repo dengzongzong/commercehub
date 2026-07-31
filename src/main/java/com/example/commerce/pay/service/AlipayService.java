@@ -12,6 +12,7 @@ import com.example.commerce.pay.entity.PayOrder;
 import com.example.commerce.pay.mapper.PayOrderMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,6 +24,7 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "mock.enabled", havingValue = "false", matchIfMissing = true)
 public class AlipayService implements PayService {
 
     private static final String CHANNEL = "ALIPAY";

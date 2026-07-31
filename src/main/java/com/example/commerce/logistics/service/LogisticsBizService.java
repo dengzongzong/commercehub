@@ -18,10 +18,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class LogisticsBizService {
 
-    private final KdniaoLogisticsService logisticsService;
+    private final LogisticsService logisticsService;
     private final LogisticsOrderMapper logisticsOrderMapper;
 
-    public LogisticsBizService(KdniaoLogisticsService logisticsService,
+    public LogisticsBizService(LogisticsService logisticsService,
                                LogisticsOrderMapper logisticsOrderMapper) {
         this.logisticsService = logisticsService;
         this.logisticsOrderMapper = logisticsOrderMapper;

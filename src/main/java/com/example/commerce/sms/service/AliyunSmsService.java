@@ -9,6 +9,7 @@ import com.example.commerce.sms.config.AliyunSmsProperties;
 import com.example.commerce.sms.dto.SmsReq;
 import com.example.commerce.sms.dto.SmsResp;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "mock.enabled", havingValue = "false", matchIfMissing = true)
 public class AliyunSmsService implements SmsService {
 
     private static final String VENDOR = "ALIYUN";

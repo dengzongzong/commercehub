@@ -24,6 +24,7 @@ import com.wechat.pay.java.service.refund.model.AmountReq;
 import com.wechat.pay.java.service.refund.model.CreateRequest;
 import com.wechat.pay.java.service.refund.model.Refund;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -34,6 +35,7 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "mock.enabled", havingValue = "false", matchIfMissing = true)
 public class WechatPayService implements PayService {
 
     private static final String CHANNEL = "WECHAT";

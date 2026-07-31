@@ -10,6 +10,7 @@ import com.example.commerce.common.BizException;
 import com.example.commerce.logistics.config.KdniaoProperties;
 import com.example.commerce.logistics.dto.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
@@ -24,6 +25,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "mock.enabled", havingValue = "false", matchIfMissing = true)
 public class KdniaoLogisticsService implements LogisticsService {
 
     private static final String CARRIER = "KDNIAO";

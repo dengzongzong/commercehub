@@ -6,6 +6,8 @@ server:
 spring:
   application:
     name: commerce-app
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:commerce}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
@@ -30,6 +32,10 @@ mybatis-plus:
 logging:
   level:
     com.example.commerce: INFO
+
+# ====== Mock 开关(本地调试用，生产关闭) ======
+mock:
+  enabled: ${MOCK_ENABLED:false}
 
 # ====== 支付 ======
 pay:

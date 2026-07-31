@@ -1,11 +1,16 @@
 package com.example.commerce.common;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 统一响应结构
+ *
+ * 注：保留无参构造器供 Jackson 反序列化（测试/内部调用用到），
+ * 对外仍用静态工厂方法构造。
  */
 @Data
+@NoArgsConstructor
 public class Response<T> {
 
     private int code;

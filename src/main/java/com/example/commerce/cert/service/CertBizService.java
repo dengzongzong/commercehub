@@ -22,7 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CertBizService {
 
-    private final AlipayCertClient alipayCertClient;
+    private final CertClient certClient;
     private final CertRecordMapper certRecordMapper;
 
     /**
@@ -32,10 +32,10 @@ public class CertBizService {
         String bizNo = "CERT" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6);
 
         // 1. 调支付宝初始化
-        String certifyId = alipayCertClient.initialize(bizNo, req.getBizCode(), req.getRealName(), req.getCertNo());
+        String certifyId = certClient.initialize(bizNo, req.getBizCode(), req.getRealName(), req.getCertNo());
 
         // 2. 生成认证URL
-        String certifyUrl = alipayCertClient.generateCertifyUrl(certifyId);
+        String certifyUrl = certClient.generateCertifyUrl(certifyId);
 
         // 3. 落库
         CertRecord record = new CertRecord();
@@ -74,7 +74,7 @@ public class CertBizService {
         }
 
         // 调支付宝查询
-        boolean passed = alipayCertClient.query(record.getCertifyId());
+        boolean passed = certClient.query(record.getCertifyId());
         String finalStatus = passed ? "PASSED" : "FAILED";
 
         // 幂等更新：PROCESSING -> 终态

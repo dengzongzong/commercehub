@@ -14,10 +14,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class SmsBizService {
 
-    private final AliyunSmsService smsService;
+    private final SmsService smsService;
     private final SmsRecordMapper smsRecordMapper;
 
-    public SmsBizService(AliyunSmsService smsService, SmsRecordMapper smsRecordMapper) {
+    public SmsBizService(SmsService smsService, SmsRecordMapper smsRecordMapper) {
         this.smsService = smsService;
         this.smsRecordMapper = smsRecordMapper;
     }

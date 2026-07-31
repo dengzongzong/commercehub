@@ -13,6 +13,7 @@ import com.example.commerce.common.BizException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,7 +27,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AlipayCertClient {
+@ConditionalOnProperty(name = "mock.enabled", havingValue = "false", matchIfMissing = true)
+public class AlipayCertClient implements CertClient {
 
     private final CertProperties props;
     private AlipayClient client;
