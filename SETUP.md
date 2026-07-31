@@ -261,11 +261,32 @@ CREATE DATABASE commerce DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_c
 ```bash
 # 编译
 mvn clean package -DskipTests
+```
 
-# 运行
-java -jar target/commercehub.jar
+编译后 `target/` 下会产出三种产物：
 
-# 或开发模式
+| 产物 | 说明 | 体积 |
+|------|------|------|
+| `commercehub.jar` | **thin jar**，只含业务代码 | 很小（几十 KB） |
+| `commercehub-exec.jar` | **fat jar**，含所有依赖，可直接运行 | 较大（约 80-100 MB） |
+| `lib/` 目录 | 所有第三方依赖 jar | 约 80 MB |
+
+**方式一：用 fat jar 直接运行（最简单）**
+```bash
+java -jar target/commercehub-exec.jar
+```
+
+**方式二：用 thin jar + lib 目录运行（jar 小，依赖外部）**
+```bash
+# Linux/Mac
+java -cp "target/commercehub.jar:target/lib/*" com.example.commerce.CommerceApplication
+
+# Windows
+java -cp "target/commercehub.jar;target/lib/*" com.example.commerce.CommerceApplication
+```
+
+**开发模式**
+```bash
 mvn spring-boot:run
 ```
 

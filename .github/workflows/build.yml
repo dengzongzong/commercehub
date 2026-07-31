@@ -22,9 +22,32 @@ jobs:
       - name: Build with Maven
         run: mvn -B clean package -DskipTests
 
-      - name: Upload artifact
+      - name: Show build artifacts
+        run: |
+          echo "=== target 目录 ==="
+          ls -lh target/*.jar target/lib 2>/dev/null | head -40
+          echo "=== 体积对比 ==="
+          echo -n "thin jar (业务代码): "; du -h target/commercehub.jar | cut -f1
+          echo -n "exec jar (含依赖):   "; du -h target/commercehub-exec.jar | cut -f1
+          echo -n "lib 目录 (依赖包):   "; du -sh target/lib | cut -f1
+
+      - name: Upload thin jar (业务代码)
         uses: actions/upload-artifact@v4
         with:
-          name: commerce-app
-          path: target/commerce-app.jar
+          name: commercehub-thin
+          path: target/commercehub.jar
+          retention-days: 7
+
+      - name: Upload exec jar (可直接运行)
+        uses: actions/upload-artifact@v4
+        with:
+          name: commercehub-exec
+          path: target/commercehub-exec.jar
+          retention-days: 7
+
+      - name: Upload lib (依赖包)
+        uses: actions/upload-artifact@v4
+        with:
+          name: commercehub-lib
+          path: target/lib/*.jar
           retention-days: 7
