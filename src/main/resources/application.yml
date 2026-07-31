@@ -46,6 +46,7 @@ pay:
     api-v3-key: ${WECHAT_API_V3_KEY:}
     cert-serial-no: ${WECHAT_CERT_SERIAL_NO:}
     private-key: ${WECHAT_PRIVATE_KEY:}
+    private-key-path: ${WECHAT_PRIVATE_KEY_PATH:}
     notify-url: ${WECHAT_NOTIFY_URL:}
 
 # ====== 物流 ======

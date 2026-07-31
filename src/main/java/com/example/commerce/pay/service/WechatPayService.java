@@ -8,15 +8,21 @@ import com.example.commerce.pay.mapper.PayOrderMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.wechat.pay.java.core.Config;
 import com.wechat.pay.java.core.RSAAutoCertificateConfig;
+import com.wechat.pay.java.core.notification.NotificationConfig;
+import com.wechat.pay.java.core.notification.NotificationParser;
+import com.wechat.pay.java.core.notification.RequestParam;
 import com.wechat.pay.java.service.payments.jsapi.JsapiService;
+import com.wechat.pay.java.service.payments.jsapi.JsapiServiceExtension;
 import com.wechat.pay.java.service.payments.jsapi.model.Amount;
+import com.wechat.pay.java.service.payments.jsapi.model.Payer;
 import com.wechat.pay.java.service.payments.jsapi.model.PrepayRequest;
 import com.wechat.pay.java.service.payments.jsapi.model.PrepayResponse;
+import com.wechat.pay.java.service.payments.jsapi.model.QueryOrderByOutTradeNoRequest;
 import com.wechat.pay.java.service.payments.model.Transaction;
 import com.wechat.pay.java.service.refund.RefundService;
+import com.wechat.pay.java.service.refund.model.AmountReq;
 import com.wechat.pay.java.service.refund.model.CreateRequest;
 import com.wechat.pay.java.service.refund.model.Refund;
-import com.wechat.pay.java.service.refund.model.AmountReq;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +30,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 /**
- * 微信支付实现 (JSAPI)
+ * 微信支付实现 (JSAPI) - 适配 wechatpay-java 0.2.17
  */
 @Slf4j
 @Service
@@ -36,20 +42,32 @@ public class WechatPayService implements PayService {
     private final PayOrderMapper payOrderMapper;
     private final Config config;
     private final JsapiService jsapiService;
-    private final com.wechat.pay.java.service.payments.jsapi.JsapiServiceExtension queryService;
+    private final JsapiServiceExtension queryService;
     private final RefundService refundService;
+    private final NotificationConfig notificationConfig;
 
     public WechatPayService(WechatProperties props, PayOrderMapper payOrderMapper) {
         this.props = props;
         this.payOrderMapper = payOrderMapper;
-        // SDK 会自动下载平台证书
-        this.config = new RSAAutoCertificateConfig(
-                props.getMchId(),
-                props.getCertSerialNo(),
-                props.getApiV3Key(),
-                props.getPrivateKey());
+
+        RSAAutoCertificateConfig.Builder builder = new RSAAutoCertificateConfig.Builder()
+                .merchantId(props.getMchId())
+                .merchantSerialNumber(props.getCertSerialNo())
+                .apiV3Key(props.getApiV3Key());
+
+        // 优先用私钥文件路径，其次用私钥内容
+        if (props.getPrivateKeyPath() != null && !props.getPrivateKeyPath().isEmpty()) {
+            builder.privateKeyFromPath(props.getPrivateKeyPath());
+        } else if (props.getPrivateKey() != null && !props.getPrivateKey().isEmpty()) {
+            builder.privateKey(props.getPrivateKey());
+        } else {
+            throw new IllegalStateException("微信支付私钥未配置，请设置 wechat.private-key-path 或 wechat.private-key");
+        }
+
+        this.config = builder.build();
+        this.notificationConfig = (NotificationConfig) this.config;
         this.jsapiService = new JsapiService.Builder().config(config).build();
-        this.queryService = new com.wechat.pay.java.service.payments.jsapi.JsapiServiceExtension.Builder().config(config).build();
+        this.queryService = new JsapiServiceExtension.Builder().config(config).build();
         this.refundService = new RefundService.Builder().config(config).build();
     }
 
@@ -73,8 +91,7 @@ public class WechatPayService implements PayService {
             amount.setCurrency("CNY");
             request.setAmount(amount);
 
-            // openid 需业务方传入，这里简化
-            com.wechat.pay.java.service.payments.jsapi.model.Payer payer = new com.wechat.pay.java.service.payments.jsapi.model.Payer();
+            Payer payer = new Payer();
             payer.setOpenid(req.getOpenid());
             request.setPayer(payer);
 
@@ -88,24 +105,23 @@ public class WechatPayService implements PayService {
 
     @Override
     public boolean verifyNotify(String body, Map<String, String> headers) {
-        // SDK 内置验签，parseNotify 时同步验签
+        // SDK 在 parse 时自动验签
         return true;
     }
 
     @Override
     public PayResult parseNotify(String body, Map<String, String> headers) {
         try {
-            // 微信回调需要: Wechatpay-Timestamp / Wechatpay-Nonce / Wechatpay-Signature / Wechatpay-Serial
-            com.wechat.pay.java.core.notification.NotificationConfig notificationConfig =
-                    new com.wechat.pay.java.core.notification.RSAAutoCertificateConfig(
-                            props.getMchId(),
-                            props.getCertSerialNo(),
-                            props.getApiV3Key(),
-                            props.getPrivateKey());
-            com.wechat.pay.java.core.notification.NotificationParser parser =
-                    new com.wechat.pay.java.core.notification.NotificationParser(notificationConfig);
-            com.wechat.pay.java.service.payments.model.Transaction tx =
-                    parser.parse(body, headers, Transaction.class);
+            RequestParam requestParam = new RequestParam.Builder()
+                    .serialNumber(getHeader(headers, "Wechatpay-Serial"))
+                    .nonce(getHeader(headers, "Wechatpay-Nonce"))
+                    .signature(getHeader(headers, "Wechatpay-Signature"))
+                    .timestamp(getHeader(headers, "Wechatpay-Timestamp"))
+                    .body(body)
+                    .build();
+
+            NotificationParser parser = new NotificationParser(notificationConfig);
+            Transaction tx = parser.parse(requestParam, Transaction.class);
 
             PayResult r = new PayResult();
             r.setOutTradeNo(tx.getOutTradeNo());
@@ -152,7 +168,11 @@ public class WechatPayService implements PayService {
     @Override
     public PayResult queryTrade(String outTradeNo) {
         try {
-            Transaction tx = queryService.queryOrderByOutTradeNo(outTradeNo, props.getMchId());
+            QueryOrderByOutTradeNoRequest request = new QueryOrderByOutTradeNoRequest();
+            request.setMchid(props.getMchId());
+            request.setOutTradeNo(outTradeNo);
+
+            Transaction tx = queryService.queryOrderByOutTradeNo(request);
             PayResult r = new PayResult();
             r.setOutTradeNo(outTradeNo);
             r.setTradeNo(tx.getTransactionId());
@@ -162,5 +182,12 @@ public class WechatPayService implements PayService {
             log.error("微信查单失败", e);
             throw new BizException("微信查单失败: " + e.getMessage());
         }
+    }
+
+    private String getHeader(Map<String, String> headers, String name) {
+        if (headers == null) return null;
+        String v = headers.get(name);
+        if (v == null) v = headers.get(name.toLowerCase());
+        return v;
     }
 }

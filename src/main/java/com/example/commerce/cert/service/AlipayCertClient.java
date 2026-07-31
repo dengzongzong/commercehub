@@ -94,8 +94,9 @@ public class AlipayCertClient {
             biz.put("certify_id", certifyId);
             request.setBizContent(biz.toJSONString());
 
-            Boolean passed = client.execute(request).getPassed();
-            return Boolean.TRUE.equals(passed);
+            // SDK 返回 String "T"/"F"，转成 boolean
+            String passed = client.execute(request).getPassed();
+            return "T".equalsIgnoreCase(passed) || "true".equalsIgnoreCase(passed);
         } catch (Exception e) {
             log.error("查询认证结果失败 certifyId={}", certifyId, e);
             throw new BizException("查询认证结果失败: " + e.getMessage());

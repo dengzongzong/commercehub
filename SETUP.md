@@ -41,7 +41,8 @@ WECHAT_APP_ID=小程序/公众号AppID
 WECHAT_MCH_ID=商户号
 WECHAT_API_V3_KEY=APIv3密钥(32位)
 WECHAT_CERT_SERIAL_NO=证书序列号
-WECHAT_PRIVATE_KEY=商户私钥(apiclient_key.pem内容)
+WECHAT_PRIVATE_KEY=商户私钥(apiclient_key.pem内容，与PRIVATE_KEY_PATH二选一)
+WECHAT_PRIVATE_KEY_PATH=/path/to/apiclient_key.pem  # 推荐，私钥文件路径
 WECHAT_NOTIFY_URL=https://你的域名/api/pay/notify/wechat
 
 # ====== 快递鸟 ======
