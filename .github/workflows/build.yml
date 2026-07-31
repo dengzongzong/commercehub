@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # ====== 构建校验（在 GitHub Runner 上编译，确保代码能过编译）======
   build:
     runs-on: ubuntu-latest
 
@@ -43,60 +44,29 @@ jobs:
           path: target/commercehub-exec.jar
           retention-days: 7
 
-      - name: Upload lib (依赖包)
-        uses: actions/upload-artifact@v4
-        with:
-          name: commercehub-lib
-          path: target/lib/*.jar
-          retention-days: 7
-
-  # ====== 部署 thin jar 到服务器 ======
+  # ====== 部署：SSH 到服务器，服务器自己 git pull + 编译 + 重启 ======
   # 需要在 仓库 Settings → Secrets and variables → Actions 配置：
   #   SERVER_HOST     服务器IP/域名
   #   SERVER_PORT     SSH端口(如22)
   #   SERVER_USER     SSH用户(如root)
   #   SERVER_SSH_KEY  SSH私钥内容(ed25519或rsa)
-  #   DEPLOY_PATH     部署目录(如/opt/commercehub)
+  #   DEPLOY_PATH     部署目录(如/opt/commercehub，须已 git clone 仓库)
+  # 以及 Variables：
+  #   ENABLE_DEPLOY   设为 true 才触发部署
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    # 只有配了 SERVER_HOST 才执行部署
     if: ${{ vars.ENABLE_DEPLOY == 'true' }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download thin jar
-        uses: actions/download-artifact@v4
-        with:
-          name: commercehub-thin
-          path: artifact
-
-      - name: Prepare deploy files
-        run: |
-          mkdir -p deploy
-          cp artifact/commercehub.jar deploy/
-          cp scripts/start.sh deploy/
-
-      - name: Upload thin jar + start script (只传业务代码，几十KB)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy/commercehub.jar,deploy/start.sh"
-          target: ${{ secrets.DEPLOY_PATH }}
-          overwrite: true
-
-      - name: Restart service
+      - name: Trigger server-side deploy (git pull + mvn package + restart)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          # 远程执行部署脚本；设长超时，首次编译会下载依赖较慢
+          command_timeout: 30m
           script: |
-            cd ${{ secrets.DEPLOY_PATH }}
-            DEPLOY_PATH=${{ secrets.DEPLOY_PATH }} bash start.sh
+            DEPLOY_PATH=${{ secrets.DEPLOY_PATH }} bash ${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh

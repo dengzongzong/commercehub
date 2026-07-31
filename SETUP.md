@@ -12,7 +12,7 @@ CommerceHub 集成了支付（支付宝/微信）、物流（快递鸟）、短�
 - [六、MySQL](#六mysql)
 - [七、本地启动](#七本地启动)
 - [八、接口清单](#八接口清单)
-- [九、GitHub Actions 自动部署（thin jar）](#九github-actions-自动部署thin-jar)
+- [九、GitHub Actions 自动部署（服务器自编译）](#九github-actions-自动部署服务器自编译模式)
 
 ---
 
@@ -355,15 +355,18 @@ mvn spring-boot:run
 
 ---
 
-## 九、GitHub Actions 自动部署（thin jar）
+## 九、GitHub Actions 自动部署（服务器自编译模式）
 
-每次推送到 main 分支，GitHub Actions 会自动构建并部署 thin jar（只含业务代码，几十KB）到服务器。
+每次推送到 main 分支，GitHub Actions 会通过 SSH 触发服务器执行 `scripts/deploy.sh`：
+服务器自己 `git pull` → `mvn package` → 停旧进程 → 启动新进程。
 
-### 服务器首次准备
+**优势**：不用往服务器传 jar，服务器有完整源码，编译产物直接本地启动；首次也不用手动传 lib 目录。
 
-1. **装 JDK 17**
+### 服务器首次准备（只做一次）
+
+1. **装 JDK 17 + Maven + Git**
    ```bash
-   apt update && apt install -y openjdk-17-jre-headless
+   apt update && apt install -y openjdk-17-jdk maven git
    ```
 
 2. **装 MySQL 8**（或用云数据库）
@@ -371,22 +374,39 @@ mvn spring-boot:run
    docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=xxx -e MYSQL_DATABASE=commerce -p 3306:3306 mysql:8
    ```
 
-3. **首次部署 lib 目录**（依赖包，约80MB，只传一次）
-   - 从 GitHub Actions 构建结果下载 `commercehub-lib` artifact
-   - 解压所有 jar 到服务器 `/opt/commercehub/lib/`
-   - 后续更新业务代码只传 thin jar，lib 不动
-
-4. **配置第三方密钥环境变量**（写 `/etc/commercehub.env`，供 systemd 或启动脚本读取）
+3. **clone 仓库到部署目录**
    ```bash
+   git clone https://github.com/dengzongzong/commercehub.git /opt/commercehub
+   ```
+
+4. **配置第三方密钥环境变量**（写 `/etc/commercehub.env`，供 deploy.sh 读取）
+   ```bash
+   cat > /etc/commercehub.env <<'EOF'
    MYSQL_HOST=localhost
    MYSQL_DB=commerce
    MYSQL_USER=root
    MYSQL_PASSWORD=xxx
    ALIPAY_APP_ID=xxx
-   # ... 其他见「环境变量汇总」
+   ALIPAY_PRIVATE_KEY=xxx
+   ALIPAY_PUBLIC_KEY=xxx
+   ALIPAY_NOTIFY_URL=https://你的域名/api/pay/notify/alipay
+   WECHAT_APP_ID=xxx
+   WECHAT_MCH_ID=xxx
+   WECHAT_API_V3_KEY=xxx
+   WECHAT_CERT_SERIAL_NO=xxx
+   WECHAT_PRIVATE_KEY_PATH=/opt/commercehub/apiclient_key.pem
+   WECHAT_NOTIFY_URL=https://你的域名/api/pay/notify/wechat
+   KDNIAO_EBUSINESS_ID=xxx
+   KDNIAO_API_KEY=xxx
+   ALIYUN_AK=xxx
+   ALIYUN_SK=xxx
+   ALIYUN_SIGN=xxx
+   CERT_RETURN_URL=https://你的域名/cert/result
+   EOF
+   chmod 600 /etc/commercehub.env
    ```
 
-### 配置 GitHub Secrets
+### 配置 GitHub Secrets / Variables
 
 打开 仓库 Settings → Secrets and variables → Actions：
 
@@ -398,7 +418,7 @@ mvn spring-boot:run
 | `SERVER_PORT` | SSH端口(如22) |
 | `SERVER_USER` | SSH用户(如root) |
 | `SERVER_SSH_KEY` | SSH私钥内容 |
-| `DEPLOY_PATH` | 部署目录(如/opt/commercehub) |
+| `DEPLOY_PATH` | 部署目录(如/opt/commercehub，须已 git clone 仓库) |
 
 **Variables（非敏感开关）：**
 
@@ -417,13 +437,29 @@ cat ~/.ssh/commercehub_deploy   # 把内容贴到 SERVER_SSH_KEY Secret
 
 配好 Secrets 并把 `ENABLE_DEPLOY` 设为 `true` 后，每次 `git push origin main`：
 
-1. GitHub Actions 编译构建
-2. SCP 上传 `commercehub.jar`（几十KB）和 `start.sh` 到服务器
-3. SSH 远程执行 `start.sh`：停旧进程 → 启动新进程 → 输出日志
-
-**首次部署前**，先把 lib 目录手动传到服务器（见上方「服务器首次准备」）。之后每次只传 thin jar，秒级更新。
+1. GitHub Actions 在 Runner 上编译校验（确保代码能过编译）
+2. SSH 到服务器执行 `scripts/deploy.sh`：
+   - `git fetch + git reset --hard origin/main` 拉最新代码
+   - `mvn clean package -DskipTests` 编译
+   - 停旧进程（带 10 秒优雅退出 + 强杀兜底）
+   - `source /etc/commercehub.env` 加载密钥
+   - `java -jar target/commercehub-exec.jar` 启动
+3. Actions 日志直接输出服务器启动日志末尾 30 行
 
 ### 查看部署日志
 
 - GitHub Actions 页面：https://github.com/dengzongzong/commercehub/actions
-- 服务器日志：`tail -f /opt/commercehub/commercehub.log`
+- 服务器实时日志：`tail -f /opt/commercehub/commercehub.log`
+- 服务器手动重新部署：`DEPLOY_PATH=/opt/commercehub bash /opt/commercehub/scripts/deploy.sh`
+
+### 与旧方案（SCP thin jar）的对比
+
+| 项 | 旧方案 SCP thin jar | 新方案 服务器自编译 |
+|----|------|------|
+| 服务器依赖 | 只需 JDK | JDK + Maven + Git |
+| 每次传输 | thin jar 几十 KB | 0（服务器自己 pull） |
+| 首次准备 | 手动传 lib 目录(~80MB) | 只需 git clone |
+| 编译位置 | GitHub Runner | 服务器本地 |
+| 启动方式 | thin jar + lib classpath | exec jar（自带依赖） |
+| 首次部署耗时 | 快 | 慢（下载 Maven 依赖） |
+| 后续部署耗时 | 秒级 | 1-2 分钟（增量编译） |
